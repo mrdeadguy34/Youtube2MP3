@@ -10,3 +10,5 @@ ffmpeg added to the path
 external headers:
 picosha2 for SHA256 IDs
 json for modern C++ (json.hpp) for parsing the youtube JSON API
+
+currently very early beta: more updates soon
