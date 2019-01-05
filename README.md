@@ -3,7 +3,11 @@ Beta version of youtube-mp3 GUI program
 
 Requirements:
 
-Python installed and added to the path
+~~Python installed and added to the path~~
+#
+# -New release uses libcUrl to download the files
+# -See latest release if you do not wish to install python
+# 
 youtube-dl added to the path
 ffmpeg added to the path
 
