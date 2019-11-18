@@ -15,7 +15,7 @@ external headers:
 ~~picosha2 for SHA256 IDs~~ #Now redundant after libcUrl patch
 json for modern C++ (json.hpp) for parsing the youtube JSON API
 
-#Changes for 0.3:
+# Changes for 0.3:
 
 1. Added generalised error boxes to help show where errors may lie
 2. Added functionality for importing entire playlists through youtube
@@ -25,7 +25,7 @@ json for modern C++ (json.hpp) for parsing the youtube JSON API
 5. Fixed a bug causing the DataWidgets to be initially shown in the wrong order
 6. Added font scaling so titles and urls will now correctly fit on the screen
 
-#Hopeful upcoming fixes
+# Hopeful upcoming fixes
 
 1. Add a progress box for downloading files
  (remnants of this are already in the source code. I am currently unable to get a responsive UI while downloading the songs)
