@@ -17,19 +17,19 @@ json for modern C++ (json.hpp) for parsing the youtube JSON API
 
 #Changes for 0.3:
 
--Added generalised error boxes to help show where errors may lie
--Added functionality for importing entire playlists through youtube
--Added more poorly written comments
--Fixed a major bug causing QString to const char* conversions to fail...
+1. Added generalised error boxes to help show where errors may lie
+2. Added functionality for importing entire playlists through youtube
+3. Added more poorly written comments
+4. Fixed a major bug causing QString to const char* conversions to fail...
  therefore causing the application to incorrectly download youtube json and or incorrectly store it in the wrong file
--Fixed a bug causing the DataWidgets to be initially shown in the wrong order
--Added font scaling so titles and urls will now correctly fit on the screen
+5. Fixed a bug causing the DataWidgets to be initially shown in the wrong order
+6. Added font scaling so titles and urls will now correctly fit on the screen
 
 #Hopeful upcoming fixes
 
--Add a progress box for downloading files
+1. Add a progress box for downloading files
  (remnants of this are already in the source code. I am currently unable to get a responsive UI while downloading the songs)
--Additional options for displaying DataWidgets moire compactly
+2. Additional options for displaying DataWidgets moire compactly
 
 currently very early beta: more updates soon
 
