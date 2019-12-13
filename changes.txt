@@ -1,0 +1,4 @@
+Changes:
+
+Added done dialog after files downloaded
+Song downloads from a playlist download into one file under ther playlist id name
