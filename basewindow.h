@@ -66,7 +66,7 @@ private:
     QVector<DataWidget*> DataWidgets; //Vector containing the data widgets
     const QString apiUrl = "https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=%1&key=%2";
     const QString apiPLUrl = "https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&playlistId=%1&key=%2";
-    const QString apiKey = "AIzaSyCJbgMJHJei7mQOnPLDNoXMy4P60Zai6lo";
+    const QString apiKey = "";
     const QString baseOutDir = Directory+"Bin/Data/";
 
 public slots:
