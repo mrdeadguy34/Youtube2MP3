@@ -70,20 +70,6 @@ void execCmd(const char* command)
     CloseHandle(pi.hThread);
 }
 
-bool dirExists(const std::string& dirName_in)
-{
-  //Check if the directory has been made by the JSON download
-  //Thus checks vailidity of URL
-  DWORD ftyp = GetFileAttributesA(dirName_in.c_str());
-  if (ftyp == INVALID_FILE_ATTRIBUTES)
-    return false;  //Path error
-
-  if (ftyp & FILE_ATTRIBUTE_DIRECTORY)
-    return true;   //Directory exists
-
-  return false;    //Directory not found
-}
-
 void createErrorMessage(QString Error) 
 {
     QMessageBox* errorBox = new QMessageBox();
@@ -131,7 +117,7 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     QApplication::setApplicationName("Youtube2MP3");
-    qDebug() << "Version 0.3.1";
+    qDebug() << "Version 0.3.2";
 
     BaseWindow MainWindow;
     MainWindow.show();

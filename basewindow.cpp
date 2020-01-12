@@ -13,10 +13,10 @@
 
 using json = nlohmann::json;
 
-Downloads::Downloads(QVector<DataWidget*> Files, std::string Directory)
+Downloads::Downloads(QVector<DataWidget*> Files, QString OutputLocation)
 {
     DLFiles = Files;
-    directory = Directory;
+    outputLocation = OutputLocation;
 }
 
 void Downloads::DownloadFiles()
@@ -26,14 +26,16 @@ void Downloads::DownloadFiles()
         DataLabel* FileData = DLFiles[i]->VidData;
         QString escapedTitle = FileData->Title.replace("/", "_").replace("\\","-");
         QString escapedOutdir = FileData->Outdir.replace("/", "_").replace("\\","-");
-        std::string OUTFILE = "-o \""+directory+"Downloads/"+escapedOutdir.toStdString()+"/"
-                +escapedTitle.toStdString()+".%(ext)s\"";
-        qDebug() << QString::fromStdString(OUTFILE);
-        std::string DLCommand = "youtube-dl --extract-audio --audio-format mp3 --audio-quality 0 "
-                +OUTFILE+" "+FileData->Url.toStdString();
-        qDebug() << QString::fromStdString(DLCommand);
-        execCmd(DLCommand.c_str());
-        //emit finSong(FileData->Title);
+        QProcess dlProcess;
+        dlProcess.start(QString("youtube-dl %1 %2 %3 -o \"%4/%5/%6.%(ext)s\" %7").arg(
+                                 "--extract-audio", "--audio-format mp3", "--audio-quality 0", outputLocation, escapedOutdir, escapedTitle, FileData->Url));
+
+
+        if (!dlProcess.waitForFinished()) {
+            createErrorMessage("Download process failed.");
+            return;
+        } else {}
+
     }
     QMessageBox doneDialog;
     doneDialog.setWindowTitle("Download finished");
@@ -53,11 +55,40 @@ BaseWindow::BaseWindow(QWidget *parent)
     if(!QDir(Directory+"Bin"+"/Data").exists()) {
         QDir().mkdir(Directory+"Bin"+"/Data");
     }
+
     setWindowTitle(QString("Youtube2MP3"));
     SetSize(this, 730, 420);
-    setStyleSheet("QWidget {background-color: rgb(230, 230, 240);}");
+    setStyleSheet(QString("QWidget {background-color: %1;}").arg(getBgRGBString()));
+    CheckSettings();
     CreateActions();
     LoadWidgets();
+}
+
+QString BaseWindow::getBgRGBString() {
+    return QString("rgb(%1, %2, %3)").arg(
+                settings.value("background/red", 230).toString(),
+                settings.value("background/green", 230).toString(),
+                settings.value("background/blue", 240).toString());
+}
+
+void BaseWindow::CheckSettings() { //Ensure that all settings exist
+    //Background colors
+    if (settings.value("background/red", false) == false) {
+        settings.setValue("background/red", 230);
+    }
+    if (settings.value("background/green", false) == false) {
+        settings.setValue("background/green", 230);
+    }
+    if (settings.value("background/blue", false) == false) {
+        settings.setValue("background/blue", 240);
+    }
+    //Application options
+    if (settings.value("options/keepbin", NULL) == NULL) {
+        settings.setValue("options/keepbin", true);
+    }
+    if(settings.value("options/outputdirectory", false) == false) {
+        settings.setValue("options/outputdirectory", Directory+"Downloads/");
+    }
 }
 
 void BaseWindow::CleanUpAll()
@@ -67,43 +98,53 @@ void BaseWindow::CleanUpAll()
         DataWidgets[0]->hide();
         DataWidgets.remove(0);
     }
+    while (!(IDs.isEmpty())) {
+        IDs.remove(0);
+    }
+    if (!settings.value("options/keepbin", true).toBool()) {
+        QDir bin {Directory + "Bin/Data"};
+        bool done = bin.removeRecursively();
+        if (!done) {
+            createErrorMessage("Failed to delete bin data.");
+        }
+    }
 }
 
-//void BaseWindow::ShowDLProgress(QString title)
-//{
-//    ProgLabel->setText("Finished downloading: " + title);
-//}
+void BaseWindow::WarnProcessHang() {
+    if (DataWidgets.length() < 1) {
+        createErrorMessage("No files to download.");
+        return;
+    }
+    QMessageBox dialog;
+    dialog.setWindowTitle("Warning");
+    dialog.setIcon(QMessageBox::Warning);
+    dialog.setText("Download files?");
+    dialog.setInformativeText("Warning: process will hang until complete");
+    dialog.setStandardButtons(QMessageBox::Cancel | QMessageBox::Ok);
+    int result = dialog.exec();
+    if (result == QMessageBox::Cancel) {
+        return;
+    } else {
+        DownloadMP3();
+    }
+}
 
 void BaseWindow::DownloadMP3()
 {
     //Start the download process for all files
-    Downloads* AllFiles = new Downloads(DataWidgets, Directory.toStdString());
+    Downloads* AllFiles = new Downloads(DataWidgets, settings.value("options/outputdirectory").toString());
     QThread* DLThread = new QThread();
     AllFiles->moveToThread(DLThread);
     connect(AllFiles, &Downloads::finished, this, &BaseWindow::CleanUpAll);
-//    connect(AllFiles, &Downloads::finSong, this, &BaseWindow::ShowDLProgress);
-
-//    //Set up progress dialog
-//    ProgressBox->setWindowFlags(Qt::WindowSystemMenuHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
-//    SetSize(ProgressBox, 550, 150);
-//    ProgressBox->setWindowTitle("Current Progress");
-//    ProgressBox->setModal(true);
-//    ProgressBox->setFont(QFont("Arial", 18));
-//    ProgressBox->setStyleSheet("QDialog {background-color: rgb(230, 230, 240);}");
-//    ProgLabel->setGeometry(0, 20, 550, 60);
-//    ProgLabel->setAlignment(Qt::AlignCenter);
-//    ProgLabel->show();
-
-//    //progress dialog set up end
 
     DLThread->start();
     AllFiles->DownloadFiles();
-    //ProgressBox->close();
 }
 
 void BaseWindow::DeleteData(QString MatchID)
 {
     //Loops through to find a matching ID then hiding it and deleting it from the Vector
+    IDs.remove(IDs.indexOf(MatchID));
     for (int i = 0; i < DataWidgets.count(); i++) { //Loop through data widgets
         if (DataWidgets[i]->VidData->ID == MatchID) { //When found the matching id
             DataWidgets[i]->hide();
@@ -127,7 +168,10 @@ void BaseWindow::DeleteData(QString MatchID)
 
 void BaseWindow::ShowNext(QString ID)
 {
-    if ( DataWidgets.count() <= 1) {return;}
+    if ( DataWidgets.count() <= 1) {
+        createErrorMessage("There is no next widget to display");
+        return;
+    }
     //Loops through for a matching ID then shows the widget
     qDebug() << "Data widgets count = " << DataWidgets.count();
     for (int i = 0; i < DataWidgets.count(); i++) {
@@ -186,7 +230,11 @@ json BaseWindow::ParseJson(std::fstream& DataFile)
 void BaseWindow::createNewData(QString ID, int outFlag, QString PlaylistID = NULL)
 {
     //Create the data for a new datalabel
-    if (!dirExists(Directory.toStdString()+"/Bin/Data/"+ID.toStdString())) { //check download
+    if (IDs.count(ID) > 0) {
+        createErrorMessage("Video already in queue for download");
+        return;
+    }
+    if (!QDir(Directory+"/Bin/Data/"+ID).exists()) { //check download
         createErrorMessage("Could not find the downloaded song metadata.");
         return;
     }
@@ -232,6 +280,7 @@ void BaseWindow::createNewData(QString ID, int outFlag, QString PlaylistID = NUL
     DataLabel* NewData = new DataLabel(logoPix, highPix, title, url, ID,
                                        Folder, FormatLength, outdir, secsDuration); //Create the new data
     DataWidget* NewWidget = new DataWidget(this, NewData);
+    IDs.append(ID);
     DataWidgets.append(NewWidget); //Add the new data to the storage
     connect(NewWidget, &DataWidget::DeleteThis, this, &BaseWindow::DeleteData);
     connect(NewWidget, &DataWidget::NextData, this, &BaseWindow::ShowNext);
@@ -264,33 +313,20 @@ void BaseWindow::SubmitPlaylistUrl()
         return;
     }
 
-//    if (!dirExists(outFile.toStdString())) {
-//        createErrorMessage("Could not find downloaded metadata.");
-//        return;
-//    }
+    if (!QFile(outFile).exists()) {
+        createErrorMessage("Could not find downloaded metadata file.");
+        return;
+    }
     std::fstream DataFile(outFile.toStdString());
     json Data = ParseJson(DataFile);
     if (Data == NULL) {
         return;
     }
-//    QDialog ProgressBox;
-//    ProgressBox.setWindowFlags(Qt::WindowSystemMenuHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
-//    SetSize(&ProgressBox, 550, 150);
-//    ProgressBox.setWindowTitle("Current Progress");
-//    ProgressBox.setModal(true);
-//    ProgressBox.setFont(QFont("Arial", 18));
-//    ProgressBox.setStyleSheet("QDialog {background-color: rgb(230, 230, 240);}");
-//    QLabel *DlProgLabel = new QLabel("", &ProgressBox);
-//    DlProgLabel->setGeometry(0, 20, 550, 60);
-//    DlProgLabel->setAlignment(Qt::AlignCenter);
-//    ProgressBox.show();
+
     //For loop to pass all given IDs in the playlist to the submiturl function
     for (int i=0; i<Data["pageInfo"]["totalResults"]; i++) {
         QString ID = QString::fromStdString(Data["items"][i]["contentDetails"]["videoId"]);
-        //ProgLabel->setText("Now parsing video with ID:" + ID);
-        //ProgLabel->show();
         SubmitUrl(ID, 1, playlistID);
-        //ProgLabel->hide();
     }
 
 }
@@ -302,18 +338,15 @@ void BaseWindow::SubmitUrl(QString ytID, int outFlag, QString outdir)
     std::ofstream createFile(outFile.toUtf8().constData());
     createFile.close();
     QString URL = CreateJSONUrl(ytID);
-    //qDebug() << outFile;
     if (!QDir(baseOutDir+"/"+ytID).exists()) {
         qDebug() << "making directory";
         QDir().mkdir(baseOutDir+"/"+ytID);
     }
-    //qDebug() << outFile;
     if (GetFile(outFile, URL) == 1) {
     } else {
         createErrorMessage("Error downloading video metadata.");
         return;
     }
-    //qDebug() << URL;
     createNewData(ytID, outFlag, outdir); //Turn JSON into datalabel
 }
 
@@ -352,7 +385,7 @@ void BaseWindow::GetUrl(int Flag)
     UrlBox->setWindowTitle("Input url");
     UrlBox->setModal(true);
     UrlBox->setFont(QFont("Arial", 18));
-    UrlBox->setStyleSheet("QDialog {background-color: rgb(230, 230, 240);}");
+    UrlBox->setStyleSheet(QString("QDialog {background-color: %1;}").arg(getBgRGBString()));
     QLabel *UrlLabel = new QLabel("Url: ", UrlBox);
     UrlLabel->setGeometry(0,10, 550, 40);
     UrlLabel->setAlignment(Qt::AlignCenter);
@@ -383,6 +416,45 @@ void BaseWindow::CallGetUrlForVideo() {GetUrl(SUBMIT_VIDEO);}
 
 void BaseWindow::CallGetUrlForPlaylist() {GetUrl(SUBMIT_PLAYLIST);}
 
+void BaseWindow::setColor() {
+
+    QColor color = QColorDialog::getColor(
+                QColor(settings.value("background/red").toInt(),
+                       settings.value("background/green").toInt(),
+                       settings.value("background/blue").toInt()), this, QString("Set Background Color"));
+    if (color.isValid()) {
+        settings.setValue("background/red", color.red());
+        settings.setValue("background/green", color.green());
+        settings.setValue("background/blue", color.blue());
+        setStyleSheet(QString("QWidget {background-color: %1;}").arg(getBgRGBString()));
+        for (int i=0; i<DataWidgets.length(); i++) {
+            DataWidgets[i]->setStyleSheet(QString("QWidget {background-color: %1;}").arg(getBgRGBString()));
+        }
+    } else {
+        return;
+    }
+}
+
+void BaseWindow::setBin(bool checked) {
+    if (checked) {
+        settings.setValue("options/keepbin", true);
+    } else {
+        settings.setValue("options/keepbin", false);
+    }
+}
+
+void BaseWindow::setOutputdir() {
+    QString fileLocation = QFileDialog::getExistingDirectory(this, tr("&Select directory"),
+                                                             settings.value("options/outputdirectory", Directory).toString(),
+                                                             QFileDialog::ShowDirsOnly
+                                                             | QFileDialog::DontResolveSymlinks );
+    if (!fileLocation.isEmpty()) {
+        settings.setValue("options/outputdirectory", fileLocation);
+    } else {
+        return;
+    }
+}
+
 void BaseWindow::CreateActions()
 {
     //Create actions for the menu bars
@@ -398,10 +470,26 @@ void BaseWindow::CreateActions()
     QuitAction = new QAction(tr("&Quit"), this);
     QuitAction->setShortcut(QKeySequence::Quit);
     QuitAction->setToolTip("Close the application");
+    BgColor = new QAction(tr("&Change background color"), this);
+    BgColor->setToolTip("Chnage application background color");
+    KeepBin = new QAction(tr("&Keep download data"), this);
+    KeepBin->setCheckable(true);
+    if (settings.value("options/keepbin", true).toBool()) {
+        KeepBin->setChecked(true);
+    } else {
+        KeepBin->setChecked(false);
+    }
+    KeepBin->setToolTip("Keep download information. Includes json data and thumbnails");
+    OutputDirectory = new QAction(tr("&Change output directory"), this);
+    OutputDirectory->setShortcut(Qt::CTRL + Qt::Key_G);
+    OutputDirectory->setToolTip("Chnage the output location of the downloaded songs");
     connect(InputUrl, &QAction::triggered, this, &BaseWindow::CallGetUrlForVideo);
     connect(PlaylistInputUrl, &QAction::triggered, this, &BaseWindow::CallGetUrlForPlaylist);
-    connect(DownloadAction, &QAction::triggered, this, &BaseWindow::DownloadMP3);
+    connect(DownloadAction, &QAction::triggered, this, &BaseWindow::WarnProcessHang);
     connect(QuitAction, &QAction::triggered, this, &QApplication::quit);
+    connect(BgColor, &QAction::triggered, this, &BaseWindow::setColor);
+    connect(KeepBin, &QAction::triggered, this, &BaseWindow::setBin);
+    connect(OutputDirectory, &QAction::triggered, this, &BaseWindow::setOutputdir);
     if (!QDir(baseOutDir).exists()) {
         QDir().mkdir(baseOutDir);
     }
@@ -413,7 +501,6 @@ void BaseWindow::LoadWidgets()
     WindowMenu = new QMenuBar(this);
     MainMenu = new QMenu("&File");
     MainMenu->addAction(InputUrl);
-    MainMenu->addSeparator();
     MainMenu->addAction(PlaylistInputUrl);
     MainMenu->addSeparator();
     MainMenu->addAction(DownloadAction);
@@ -429,12 +516,29 @@ void BaseWindow::LoadWidgets()
                               "color: rgb(200, 200, 200);}"
                               "QMenuBar::item::selected {"
                               "background-color: rgb(90, 90, 90);}");
+
     MainMenu->setStyleSheet("QMenu {"
                             "background-color:rgb(130, 130, 130);"
                             "color: rgb(200,200,200);"
                             "border: 1px solid;}"
                             "QMenu::item::selected {"
                             "background-color: rgb(90, 90,90);}");
+
+    SettingsMenu = new QMenu("&Settings");
+    SettingsMenu->addAction(BgColor);
+    SettingsMenu->addSeparator();
+    SettingsMenu->addAction(KeepBin);
+    SettingsMenu->addSeparator();
+    SettingsMenu->addAction(OutputDirectory);
+    SettingsMenu->addSeparator();
+    SettingsMenu->setStyleSheet("QMenu {"
+                                "background-color:rgb(130, 130, 130);"
+                                "color: rgb(200,200,200);"
+                                "border: 1px solid;}"
+                                "QMenu::item::selected {"
+                                "background-color: rgb(90, 90,90);}");
+    WindowMenu->addSeparator();
+    WindowMenu->addMenu(SettingsMenu);
     WindowMenu->show();
 }
 

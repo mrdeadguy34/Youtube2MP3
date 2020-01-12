@@ -24,7 +24,7 @@ DataWidget::DataWidget(QWidget *parent, DataLabel* data)
 {
     //Initialising the widget and all components
     VidData = data;
-    setStyleSheet("QWidget {background-color: rgb(230, 230, 240);}");
+    //setStyleSheet(QString("QWidget {background-color: %1;}").arg());
     move(0, 24);
     setFont(QFont("Arial",25));
     SetSize(this, 730, 408);
