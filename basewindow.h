@@ -20,12 +20,13 @@ class Downloads : public QObject
     Q_OBJECT
 
 public:
-    Downloads(QVector<DataWidget*> Files, QString OutputLocation);
+    Downloads(QVector<DataWidget*> Files, QString ExesDir, QString OutputLocation);
     void DownloadFiles();
 
 private:
     QVector<DataWidget*> DLFiles;
     QString outputLocation;
+    QString exesDir;
 
 signals:
     void finished();

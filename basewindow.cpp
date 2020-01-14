@@ -13,22 +13,28 @@
 
 using json = nlohmann::json;
 
-Downloads::Downloads(QVector<DataWidget*> Files, QString OutputLocation)
+Downloads::Downloads(QVector<DataWidget*> Files, QString ExesDir, QString OutputLocation)
 {
     DLFiles = Files;
     outputLocation = OutputLocation;
+    exesDir = ExesDir;
 }
 
 void Downloads::DownloadFiles()
 {
     //Loops through each element in the vector executing the download command
+    if (!QFile(exesDir+"ffmpeg.exe").exists() || !QFile(exesDir+"youtube-dl.exe").exists()) { //Ensure the youtube_dl and ffmpeg files exist
+        createErrorMessage("Could not find executable file location for ffmpeg and youtube_dl. Ensure the Bin/Exes dir exists");
+        return;
+    }
     for (int i=0; i < DLFiles.length(); i++) {
         DataLabel* FileData = DLFiles[i]->VidData;
         QString escapedTitle = FileData->Title.replace("/", "_").replace("\\","-");
         QString escapedOutdir = FileData->Outdir.replace("/", "_").replace("\\","-");
         QProcess dlProcess;
-        dlProcess.start(QString("youtube-dl %1 %2 %3 -o \"%4/%5/%6.%(ext)s\" %7").arg(
-                                 "--extract-audio", "--audio-format mp3", "--audio-quality 0", outputLocation, escapedOutdir, escapedTitle, FileData->Url));
+        dlProcess.start(QString(exesDir+"youtube-dl %1 %2 %3 -o \"%4/%5/%6.%(ext)s\" --ffmpeg-location %7 %8").arg(
+                                 "--extract-audio", "--audio-format mp3", "--audio-quality 0", outputLocation, escapedOutdir,
+                            escapedTitle, exesDir, FileData->Url));
 
 
         if (!dlProcess.waitForFinished()) {
@@ -132,7 +138,7 @@ void BaseWindow::WarnProcessHang() {
 void BaseWindow::DownloadMP3()
 {
     //Start the download process for all files
-    Downloads* AllFiles = new Downloads(DataWidgets, settings.value("options/outputdirectory").toString());
+    Downloads* AllFiles = new Downloads(DataWidgets, Directory+"Bin/Exe/", settings.value("options/outputdirectory").toString());
     QThread* DLThread = new QThread();
     AllFiles->moveToThread(DLThread);
     connect(AllFiles, &Downloads::finished, this, &BaseWindow::CleanUpAll);
